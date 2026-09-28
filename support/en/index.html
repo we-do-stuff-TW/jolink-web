@@ -1,0 +1,66 @@
+<!doctype html>
+<!-- 揪起來的公開網頁殼(第四百四十四輪)。原稿在私人 repo 的 web/,scripts/publish-jolink-web.sh 把它
+     複製到每一條路(j/、i/、privacy/、privacy/en/…)發到公開 repo we-do-stuff-TW/jolink-web 的 GitHub Pages。
+     不要在公開 repo 那邊改 —— 下一次發布就被蓋掉。為什麼要有殼:supabase/functions/_shared/webpage.ts 的 pageGate 檔頭。 -->
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>揪起來</title>
+<meta property="og:title" content="揪起來">
+<meta property="og:site_name" content="Jolink">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://we-do-stuff-tw.github.io/jolink-web/icon.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="https://we-do-stuff-tw.github.io/jolink-web/icon.png">
+<style>
+  html, body { margin: 0; min-height: 100%; background: #FCFBF8; }
+  #fail { display: none; max-width: 360px; margin: 30vh auto 0; padding: 0 24px; text-align: center;
+          font: 16px/1.7 "PingFang TC", "Noto Sans TC", -apple-system, system-ui, sans-serif; color: #2f3038; }
+  #fail.on { display: block; }
+</style>
+</head>
+<body>
+<p id="fail">連不上。重新整理再試一次。<br>Couldn't load. Refresh to try again.</p>
+<script>
+/* 揪起來公開網頁殼的載入器(第四百四十四輪)。publish-jolink-web.sh 把它內嵌進每一頁的 shell.html。
+ *
+ * 做的事只有一件:看自己在哪一條路,向那支 edge function 要「這一頁的 HTML」(帶 format=json ——
+ * 共用網域不改寫 JSON),拿到就 document.write 整頁換上。畫卡、登入、同意、加入的程式全在函式那邊,
+ * 這裡**不准長出任何畫面邏輯**(webmoveprobe 釘:沒有第二份實作)。
+ *
+ *   /jolink-web/j/?token=…        → j?token=…&format=json
+ *   /jolink-web/i/?token=…        → i?token=…&format=json
+ *   /jolink-web/privacy/en/       → legal/privacy/en?format=json
+ *   /jolink-web/  或 /support/    → legal(/support)?format=json
+ *
+ * ⚠️ FN 與 BASE 是第二份:FN ＝ lib/invitelink.ts 的 FN_BASE 那個專案;BASE ＝ _shared/webpage.ts 的
+ *    PAGES_PATH。webmoveprobe 逐字對帳,改一邊沒改另一邊當場紅。
+ * ⚠️ 本機開發(localhost／127.0.0.1)改問同一個來源的 /functions/v1/ —— scripts/webmove-dev.mjs 在那裡
+ *    代打線上函式。只有這一個分岔,線上走不到。
+ * ⚠️ 用 document.write 整頁換,不用 innerHTML:頁面裡的 <script>(星座動畫、登入流程)要真的執行,
+ *    innerHTML 塞進去的 script 不會跑。OAuth 回來時網址後面的 #access_token 不受影響(網址沒換)。 */
+(function () {
+  var FN = "https://tfnawvhjpbrqjmaniilm.supabase.co/functions/v1/";
+  var BASE = "/jolink-web/";
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) FN = location.origin + "/functions/v1/";
+  var p = location.pathname;
+  p = p.indexOf(BASE) === 0 ? p.slice(BASE.length) : p.replace(/^\/+/, "");
+  var seg = p.split("/").filter(function (x) { return x && x !== "index.html"; });
+  var fn = (seg[0] === "j" || seg[0] === "i") ? seg[0] : "legal" + (seg.length ? "/" + seg.join("/") : "");
+  var q = new URLSearchParams(location.search);
+  q.set("format", "json");
+  function fail() { var f = document.getElementById("fail"); if (f) f.className = "on"; }
+  fetch(FN + fn + "?" + q.toString(), { cache: "no-store" })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d || typeof d.html !== "string" || !d.html) throw new Error("empty");
+      document.open();
+      document.write(d.html);
+      document.close();
+    })
+    .catch(fail);
+})();
+</script>
+</body>
+</html>
