@@ -25,9 +25,11 @@
 <script>
 /* 揪起來公開網頁殼的載入器(第四百四十四輪)。publish-jolink-web.sh 把它內嵌進每一頁的 shell.html。
  *
- * 做的事只有一件:看自己在哪一條路,向那支 edge function 要「這一頁的 HTML」(帶 format=json ——
+ * 做的事:看自己在哪一條路,向那支 edge function 要「這一頁的 HTML」(帶 format=json ——
  * 共用網域不改寫 JSON),拿到就 document.write 整頁換上。畫卡、登入、同意、加入的程式全在函式那邊,
  * 這裡**不准長出任何畫面邏輯**(webmoveprobe 釘:沒有第二份實作)。
+ * 唯一的例外是「這一頁在哪個瀏覽器裡被打開」(第二十一次健檢卡 2,見下面 LINE 那段):那不是畫面,
+ * 而且只有殼擋得到每一條連結 —— 包括 App 早就發出去的舊連結。
  *
  *   /jolink-web/j/?token=…        → j?token=…&format=json
  *   /jolink-web/i/?token=…        → i?token=…&format=json
@@ -49,6 +51,18 @@
   var seg = p.split("/").filter(function (x) { return x && x !== "index.html"; });
   var fn = (seg[0] === "j" || seg[0] === "i") ? seg[0] : "legal" + (seg.length ? "/" + seg.join("/") : "");
   var q = new URLSearchParams(location.search);
+  /* ⚠️ LINE 內建的瀏覽器(第二十一次健檢卡 2):朋友在 LINE 群組點連結,LINE 預設用它自己的瀏覽器開。
+     Google 不准在 App 內建的瀏覽器裡登入(403 disallowed_useragent),而 j 那一頁的「用 Google 繼續」
+     是整頁跳去 Google —— 於是從 LINE 點開的人登不進來,只會覺得這個網頁壞了。
+     LINE 認網址上的 openExternalBrowser=1:帶著它的網址會改用手機自己的瀏覽器打開。
+     · 只做 j:只有那一頁要登入。i(好友碼)與政策頁不用登入,不要多跳一次。
+     · 已經帶著參數、卻還在 LINE 裡(LINE 沒照做)＝照常載入,不准兜圈(webmoveprobe § 6 釘)。
+     · 未查證:「用轉址帶上參數」LINE 認不認(官方寫的是點進來的網址)—— 要真機驗,PLAN 有一行。 */
+  if (fn === "j" && /\bLine\//i.test((window.navigator && navigator.userAgent) || "") && !q.has("openExternalBrowser")) {
+    q.set("openExternalBrowser", "1");
+    location.replace(location.pathname + "?" + q.toString() + location.hash);
+    return;
+  }
   q.set("format", "json");
   function fail() { var f = document.getElementById("fail"); if (f) f.className = "on"; }
   fetch(FN + fn + "?" + q.toString(), { cache: "no-store" })
